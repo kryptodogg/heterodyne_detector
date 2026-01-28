@@ -3,6 +3,7 @@
 
 import numpy as np
 import librosa
+import torch
 from typing import Optional
 
 
@@ -27,6 +28,22 @@ class AudioProcessor:
         self.hop_length = int(hop_length * sample_rate)
         self.n_win = int(window_size * sample_rate)
         self.device = device
+
+    def extract_features(self, signal):
+        """
+        Main feature extraction entry point for RadarApp.
+        Handles Torch tensors and returns Torch tensors.
+        """
+        # Convert Torch to NumPy for librosa (which is NumPy based)
+        if isinstance(signal, torch.Tensor):
+            y = signal.cpu().numpy()
+        else:
+            y = signal
+            
+        mfcc = self.extract_mfcc(y)
+        
+        # Convert back to Torch
+        return torch.from_numpy(mfcc).to(self.device)
 
     def extract_mfcc(self, signal: np.ndarray) -> np.ndarray:
         y = np.asarray(signal, dtype=np.float32)

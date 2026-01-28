@@ -15,6 +15,7 @@ import time
 from collections import deque
 import warnings
 warnings.filterwarnings('ignore')
+import torch
 
 # Use NumPy for CPU fallbacks; heavy lifting is in Torch
 cp = np
@@ -148,6 +149,20 @@ class HeterodyneDetector:
         
         return rx1_complex, rx2_complex
     
+    def detect(self, signal1, signal2):
+        """
+        Main detection entry point for RadarApp.
+        Handles both Torch tensors and NumPy arrays.
+        """
+        # Convert Torch to NumPy for this implementation (which is legacy NumPy/CuPy)
+        # In a real Torch-first refactor, we would implement the logic in Torch.
+        # For now, we bridge the gap.
+        
+        s1 = signal1.cpu().numpy() if isinstance(signal1, torch.Tensor) else signal1
+        s2 = signal2.cpu().numpy() if isinstance(signal2, torch.Tensor) else signal2
+        
+        return self.detect_heterodyne(s1, s2)
+
     def detect_heterodyne(self, signal1, signal2):
         """
         Detect heterodyne artifacts between two signals

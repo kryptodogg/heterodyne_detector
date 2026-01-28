@@ -7,6 +7,7 @@ GPU-accelerated where possible
 """
 
 import numpy as np
+import torch
 from collections import deque
 import time
 
@@ -51,6 +52,21 @@ class PatternMatcher:
         self.matches_found = 0
         self.total_comparisons = 0
         
+    def find_matches(self, features):
+        """
+        Main pattern matching entry point for RadarApp.
+        Handles Torch tensors.
+        """
+        # Convert Torch to NumPy for this implementation
+        if isinstance(features, torch.Tensor):
+            feat_np = features.cpu().numpy()
+        else:
+            feat_np = features
+            
+        # Return empty list for now (stub-like behavior)
+        # or implement logic if desired.
+        return []
+
     def extract_features(self, signal):
         """
         Extract features from signal for pattern matching
