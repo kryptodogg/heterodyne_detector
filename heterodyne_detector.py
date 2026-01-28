@@ -26,7 +26,7 @@ class HeterodyneDetector:
     """
     
     def __init__(self, sample_rate=2.4e6, center_freq=100e6, 
-                 rx_gain=50, buffer_size=2**16):
+                 rx_gain=50, buffer_size=2**16, device='cpu', **kwargs):
         """
         Initialize the heterodyne detector
         
@@ -35,11 +35,13 @@ class HeterodyneDetector:
             center_freq: Center frequency in Hz (default 100 MHz)
             rx_gain: RX gain in dB (default 50)
             buffer_size: Buffer size for processing
+            device: torch device
         """
         self.sample_rate = sample_rate
         self.center_freq = center_freq
         self.rx_gain = rx_gain
         self.buffer_size = buffer_size
+        self.device = device
         
         # Connect to Pluto+
         self.ctx = None

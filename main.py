@@ -180,6 +180,11 @@ class RadarApp:
             base_path=HDF5_STORAGE['base_path']
         )
         
+        # Pre-allocate Torch buffers for signal ingress
+        self.buffer_size = GPU_CONFIG['buffer_size']
+        self.rx1_buffer = torch.zeros(self.buffer_size, dtype=torch.complex64, device=self.device)
+        self.rx2_buffer = torch.zeros(self.buffer_size, dtype=torch.complex64, device=self.device)
+        
         # Visualization
         self.visualizer = None
         if enable_viz:

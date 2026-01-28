@@ -25,13 +25,9 @@ GPU_AVAILABLE = False
 
 
 class PatternMatcher:
-    """
-    Advanced pattern matching for detecting repeated heterodyne artifacts
-    using DTW and Levenshtein distance
-    """
-    
-    def __init__(self, window_size=4096, overlap=0.5, 
-                 max_patterns=1000, similarity_threshold=0.85):
+    def __init__(self, window_size=1024, overlap=0.5, max_patterns=1000, 
+                 similarity_threshold=0.8, device='cpu', **kwargs):
+        self.device = device
         """
         Initialize pattern matcher
         
