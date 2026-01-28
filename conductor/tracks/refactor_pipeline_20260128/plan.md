@@ -6,7 +6,7 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Preparation & Scaffolding' (Protocol in workflow.md)
 
 ## Phase 2: Configuration & Geometry Refactor
-- [ ] Task: Update `config.py` for Torch compatibility
+- [x] Task: Update `config.py` for Torch compatibility [commit: 106e695]
     - [ ] Add Torch-based pre-calculation helpers
 - [ ] Task: Implement `RadarGeometry` in `main.py` or a local module
     - [ ] Create `RadarGeometry` dataclass with Torch tensor positions
