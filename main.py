@@ -32,12 +32,18 @@ from config import (
     MFCC_RADAR_SETTINGS,
     GPU_CONFIG,
     HDF5_STORAGE,
+    RANGE_DOPPLER,
+    PPI_CONFIG,
+    TRACKING,
     get_torch_geometry
 )
 from sdr_interface import PlutoRadarInterface
 from audio_processor import AudioProcessor as RadarAudioProcessor
 from heterodyne_detector import HeterodyneDetector as HeterodyneDetectorTorch
 from noise_canceller import SpatialNoiseCanceller
+from range_doppler import RangeDopplerProcessor
+from ppi_processor import PPIProcessor
+from tracker import TargetTracker
 from pattern_matcher import PatternMatcher as RadarPatternMatcher
 from data_manager import HDF5LibraryManager as HDF5DataManager
 from visualizer import VisualizerDash as RadarDashboard
@@ -180,6 +186,25 @@ class RadarApp:
             base_path=HDF5_STORAGE['base_path']
         )
         
+        # Range-Doppler processor (pseudo-pulse CW mode)
+        self.rd_processor = RangeDopplerProcessor(
+            config=RANGE_DOPPLER,
+            device=self.device
+        )
+        
+        # PPI (Polar Position Indicator) processor
+        self.ppi_processor = PPIProcessor(
+            geometry=self.geometry,
+            config=PPI_CONFIG,
+            device=self.device
+        )
+        
+        # Target tracker (Kalman filter multi-target)
+        self.tracker = TargetTracker(
+            config=TRACKING,
+            device=self.device
+        )
+        
         # Pre-allocate Torch buffers for signal ingress
         self.buffer_size = GPU_CONFIG['buffer_size']
         self.rx1_buffer = torch.zeros(self.buffer_size, dtype=torch.complex64, device=self.device)
@@ -189,7 +214,7 @@ class RadarApp:
         self.visualizer = None
         if enable_viz:
             self.visualizer = RadarDashboard(
-                refresh_rate_hz=60,
+                refresh_rate_hz=20,  # 20 Hz for 9 plots
                 geometry=self.geometry
             )
         
@@ -208,9 +233,10 @@ class RadarApp:
         print(f"   Device: {self.device}")
         print(f"   Visualization: {'Enabled' if enable_viz else 'Disabled'}")
         print("="*60)
+
     
     def _setup_gpu(self):
-        """Setup GPU and verify Torch + ROCm"""
+        """Setup GPU and verify Torch + ROCm functionality"""
         if not torch.cuda.is_available():
             print("⚠️  WARNING: CUDA/ROCm not available!")
             print("   Falling back to CPU (will be slow)")
@@ -221,11 +247,24 @@ class RadarApp:
         print(f"   Device: {torch.cuda.get_device_name(0)}")
         print(f"   Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
         
-        # Set memory allocation strategy
-        torch.cuda.set_per_process_memory_fraction(
-            GPU_CONFIG['memory_fraction'], 
-            device=0
-        )
+        # GPU Health Check: Test matmul (common point of failure on ROCm)
+        try:
+            test_a = torch.randn(2, 2, device=device)
+            test_b = torch.randn(2, 2, device=device)
+            torch.matmul(test_a, test_b)
+            print("   GPU Health Check: matmul OK")
+        except RuntimeError as e:
+            print(f"⚠️  WARNING: GPU matmul failed: {e}")
+            print("   The GPU is available but its BLAS libraries failed to initialize.")
+            print("   Falling back to CPU for stability.")
+            return torch.device('cpu')
+        
+        # Set memory allocation strategy (optional)
+        if 'memory_fraction' in GPU_CONFIG:
+            torch.cuda.set_per_process_memory_fraction(
+                GPU_CONFIG['memory_fraction'], 
+                device=0
+            )
         
         return device
     
@@ -244,7 +283,7 @@ class RadarApp:
     
     def process_buffer(self, rx1, rx2, tx1_ref=None, tx2_ref=None):
         """
-        Process a single buffer of radar data
+        Process single buffer through full radar pipeline.
         
         Args:
             rx1: RX1 complex samples (numpy or torch)
@@ -253,7 +292,7 @@ class RadarApp:
             tx2_ref: TX2 reference (optional)
         
         Returns:
-            dict: Processing results
+            dict: Full pipeline results with Range-Doppler, PPI, tracking
         """
         start_time = time.time()
         
@@ -262,7 +301,7 @@ class RadarApp:
             rx1 = torch.from_numpy(rx1).to(self.device)
             rx2 = torch.from_numpy(rx2).to(self.device)
         
-        # Step 1: Spatial noise cancellation (beamforming)
+        # Step 1: Spatial noise cancellation (beamforming + LMS)
         clean_rx1, clean_rx2, cancellation_info = self.noise_canceller.cancel(
             rx1, rx2
         )
@@ -270,34 +309,49 @@ class RadarApp:
         # Step 2: Heterodyne detection
         detection = self.detector.detect(clean_rx1, clean_rx2)
         
-        # Step 3: MFCC radar feature extraction
+        # Step 3: Range-Doppler processing (NEW)
+        rd_results = self.rd_processor.process(clean_rx1)
+        
+        # Step 4: PPI processing (NEW)
+        ppi_results = self.ppi_processor.process(clean_rx1, clean_rx2)
+        
+        # Step 5: Target tracking from Range-Doppler detections (NEW)
+        tracks = self.tracker.update(rd_results['detections'])
+        
+        # Step 6: MFCC radar feature extraction
         mfcc_features = self.audio_proc.extract_features(clean_rx1)
         
-        # Step 4: Pattern matching
+        # Step 7: Pattern matching
         matches = self.pattern_matcher.find_matches(mfcc_features)
         
-        # Step 5: Update statistics
+        # Step 8: Update statistics
         processing_time = time.time() - start_time
         self._update_stats(processing_time, detection, matches)
         
-        # Prepare results
+        # Comprehensive results with all pipeline outputs
         results = {
             'detection': detection,
             'mfcc_features': mfcc_features,
             'pattern_matches': matches,
             'cancellation_info': cancellation_info,
+            'range_doppler': rd_results,
+            'ppi': ppi_results,
+            'tracks': tracks,
             'processing_time': processing_time,
             'timestamp': time.time()
         }
         
-        # Update visualization if enabled
+        # Update visualization with all new data (NEW)
         if self.visualizer:
             self.visualizer.update(
                 rx1=clean_rx1.cpu().numpy(),
                 rx2=clean_rx2.cpu().numpy(),
                 mfcc=mfcc_features.cpu().numpy(),
                 detection=detection,
-                geometry_info=cancellation_info
+                geometry_info=cancellation_info,
+                range_doppler_map=rd_results['range_doppler_map'],
+                ppi=ppi_results,
+                tracks=tracks
             )
         
         return results
@@ -425,7 +479,10 @@ class RadarApp:
             self.visualizer.stop()
         
         # Disconnect SDR
-        self.sdr.disconnect()
+        if hasattr(self.sdr, 'close'):
+            self.sdr.close()
+        elif hasattr(self.sdr, 'disconnect'):
+            self.sdr.disconnect()
         
         # Print final statistics
         self._print_final_stats()

@@ -73,10 +73,14 @@ class SpatialNoiseCanceller:
         num_angles = self.steering_vectors.shape[0]
         powers = torch.zeros(num_angles, dtype=torch.float32, device=self.device)
         
+        # Ensure X is on target device
+        X = X.to(self.device)
+        
         for i in range(num_angles):
-            sv = self.steering_vectors[i, :2]  # Get only RX components (2 elements)
+            sv = self.steering_vectors[i, :2].to(self.device)  # Get only RX components (2 elements)
             # Beamformer output: y = sv^H @ X
-            y = torch.sum(sv.conj() * X, dim=0)  # Sum over RX channels
+            # Explicit view(2, 1) to broadcast over N samples
+            y = torch.sum(sv.conj().view(2, 1) * X, dim=0)  # Sum over RX channels
             # Power: E[|y|^2]
             powers[i] = torch.mean(torch.abs(y) ** 2)
         
@@ -119,7 +123,8 @@ class SpatialNoiseCanceller:
             mvdr_weights = sv_target / (torch.sum(torch.abs(sv_target) ** 2) + 1e-10)
         
         # Apply MVDR beamformer: y = w^H @ X
-        beamformed = torch.sum(mvdr_weights.conj() * X, dim=0)
+        # Explicit view(2, 1) to broadcast over N samples
+        beamformed = torch.sum(mvdr_weights.conj().view(2, 1) * X, dim=0)
         
         # Return beamformed signal on both channels (for compatibility)
         return beamformed, beamformed * 0.5  # RX2 gets attenuated version
