@@ -1,7 +1,7 @@
 # Implementation Plan: Refactor Core Pipeline for Torch-First Performance
 
 ## Phase 1: Preparation & Scaffolding
-- [ ] Task: Initialize testing environment for core signal processing
+- [x] Task: Initialize testing environment for core signal processing [commit: 5a2a17d]
     - [ ] Create `tests/test_signal_math.py` to compare NumPy vs Torch results
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Preparation & Scaffolding' (Protocol in workflow.md)
 
