@@ -8,7 +8,7 @@
 ## Phase 2: Configuration & Geometry Refactor
 - [x] Task: Update `config.py` for Torch compatibility [commit: 106e695]
     - [ ] Add Torch-based pre-calculation helpers
-- [ ] Task: Implement `RadarGeometry` in `main.py` or a local module
+- [x] Task: Implement `RadarGeometry` in `main.py` or a local module [commit: 715b586]
     - [ ] Create `RadarGeometry` dataclass with Torch tensor positions
     - [ ] Verify steering vector math in Torch
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Configuration & Geometry Refactor' (Protocol in workflow.md)
