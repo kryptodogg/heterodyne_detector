@@ -16,7 +16,7 @@
 ## Phase 3: Main Pipeline Refactor
 - [x] Task: Refactor `RadarApp.__init__` for optimized GPU setup [commit: b6baee2]
     - [ ] Pre-allocate Torch buffers for signal ingress
-- [ ] Task: Update `RadarApp.process_buffer` to use Torch-first logic
+- [x] Task: Update `RadarApp.process_buffer` to use Torch-first logic [commit: 3ee2954]
     - [ ] Remove redundant NumPy conversions
     - [ ] Ensure all sub-modules (detector, canceller) receive Torch tensors
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Main Pipeline Refactor' (Protocol in workflow.md)
