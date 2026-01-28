@@ -16,16 +16,9 @@ from collections import deque
 import warnings
 warnings.filterwarnings('ignore')
 
-# GPU acceleration imports
-try:
-    import cupy as cp
-    from cupyx.scipy import signal as cp_signal
-    GPU_AVAILABLE = True
-    print("GPU acceleration enabled (CuPy)")
-except ImportError:
-    print("GPU not available, falling back to CPU. Install cupy for GPU acceleration.")
-    GPU_AVAILABLE = False
-    cp = np
+# Use NumPy for CPU fallbacks; heavy lifting is in Torch
+cp = np
+GPU_AVAILABLE = False
 
 class HeterodyneDetector:
     """

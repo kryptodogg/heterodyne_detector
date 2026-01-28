@@ -19,21 +19,9 @@ except ImportError:
     print("Warning: dtaidistance not available. Install for DTW support.")
     DTW_AVAILABLE = False
 
-# Levenshtein imports
-try:
-    import Levenshtein
-    LEVENSHTEIN_AVAILABLE = True
-except ImportError:
-    print("Warning: python-Levenshtein not available. Install for faster string matching.")
-    LEVENSHTEIN_AVAILABLE = False
-
-# GPU acceleration
-try:
-    import cupy as cp
-    GPU_AVAILABLE = True
-except ImportError:
-    GPU_AVAILABLE = False
-    cp = np
+# Heavy lifting is handled via Torch
+cp = np
+GPU_AVAILABLE = False
 
 
 class PatternMatcher:
