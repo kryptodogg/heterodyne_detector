@@ -33,6 +33,6 @@
     - [x] Add spectral centroid and voice-likeness metrics
 - [x] Task: Integrate `RadioToAcousticHeterodyner` into `heterodyne_detector.py` [commit: a823ca3]
     - [x] Replace basic heterodyning with multi-stage downconversion
-- [~] Task: Enhance `noise_canceller.py` with adaptive notch filtering
-    - [ ] Implement frequency-domain tonal interference removal
+- [x] Task: Enhance `noise_canceller.py` with adaptive notch filtering [commit: 5415dd5]
+    - [x] Implement frequency-domain tonal interference removal
 - [ ] Task: Conductor - User Manual Verification 'Phase 5: Expert Signal Processing Techniques' (Protocol in workflow.md)
