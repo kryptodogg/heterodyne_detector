@@ -26,3 +26,13 @@
     - [ ] Measure end-to-end latency on GPU
 - [ ] Task: Final system integration test with simulation mode
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: Performance & Integration' (Protocol in workflow.md)
+
+## Phase 5: Expert Signal Processing Techniques (radar-expert)
+- [x] Task: Refactor `audio_processor.py` for pure Torch performance [commit: 43d37bb]
+    - [x] Implement `AcousticFeatureExtractor` with Torch-based MFCCs
+    - [x] Add spectral centroid and voice-likeness metrics
+- [~] Task: Integrate `RadioToAcousticHeterodyner` into `heterodyne_detector.py`
+    - [ ] Replace basic heterodyning with multi-stage downconversion
+- [ ] Task: Enhance `noise_canceller.py` with adaptive notch filtering
+    - [ ] Implement frequency-domain tonal interference removal
+- [ ] Task: Conductor - User Manual Verification 'Phase 5: Expert Signal Processing Techniques' (Protocol in workflow.md)
