@@ -14,7 +14,7 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Configuration & Geometry Refactor' (Protocol in workflow.md)
 
 ## Phase 3: Main Pipeline Refactor
-- [ ] Task: Refactor `RadarApp.__init__` for optimized GPU setup
+- [x] Task: Refactor `RadarApp.__init__` for optimized GPU setup [commit: b6baee2]
     - [ ] Pre-allocate Torch buffers for signal ingress
 - [ ] Task: Update `RadarApp.process_buffer` to use Torch-first logic
     - [ ] Remove redundant NumPy conversions
