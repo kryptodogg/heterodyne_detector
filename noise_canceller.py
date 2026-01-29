@@ -103,28 +103,45 @@ class SpatialNoiseCanceller:
 
     def _adaptive_lms(self, primary: torch.Tensor, reference: torch.Tensor) -> torch.Tensor:
         """
-        Semi-vectorized LMS filter. 
-        Uses block-based updates to minimize Python overhead while avoiding matmul.
+        Vectorized Block LMS filter. 
+        Uses sliding window views to minimize Python overhead.
         """
         N = primary.shape[0]
         L = self.filter_length
-        filtered = torch.zeros_like(primary)
+        filtered = primary.clone()
         
-        # Process in larger blocks to reduce Python loop iterations
-        # Inside each block, we still need sequential logic for LMS adaptation,
-        # but we use Torch operations for the internal windowing and dot products.
-        block_size = 1024
+        # Block size for weight updates (trade-off between speed and convergence)
+        block_size = 4096 
+        
         for n in range(L, N, block_size):
             end = min(n + block_size, N)
-            # This inner loop is the remaining bottleneck. 
-            # In a true Torch-first world, we'd use a custom kernel or a working matmul.
-            # Here we minimize ops.
-            for i in range(n, end):
-                x = reference[i-L:i].flip(0)
-                y = torch.sum(self.weights.conj() * x)
-                e = primary[i] - y
-                self.weights += self.mu * e * x.conj()
-                filtered[i] = e # Error IS the cleaned signal in ANC mode
+            curr_len = end - n
+            
+            # 1. Create sliding window view of reference for this block
+            # Shape: (curr_len, L)
+            # Use unfold to get windows [i-L:i] for each i in [n:end]
+            # Note: unfold expects dimension, size, step
+            # We need to be careful with indexing to match sample-by-sample logic
+            ref_windows = reference[n-L:end].unfold(0, L, 1)[:curr_len]
+            # Flip windows to match filter orientation [x[n], x[n-1], ...]
+            ref_windows = ref_windows.flip(1)
+            
+            # 2. Vectorized Filter Output: y = X @ w*
+            # Shape: (curr_len,)
+            y_block = torch.sum(ref_windows * self.weights.conj(), dim=1)
+            
+            # 3. Compute error for the whole block
+            e_block = primary[n:end] - y_block
+            
+            # 4. Vectorized Weight Update (Block average)
+            # Update: w = w + mu * mean(e * x*)
+            # ref_windows.conj() is (curr_len, L), e_block is (curr_len,)
+            grad = torch.mean(e_block.unsqueeze(1) * ref_windows.conj(), dim=0)
+            self.weights += self.mu * grad
+            
+            # 5. Store result
+            filtered[n:end] = e_block
+            
         return filtered
 
     def synthesize_active_cancellation(self, signal: torch.Tensor, sample_rate: float) -> torch.Tensor:

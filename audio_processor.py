@@ -81,17 +81,13 @@ class AudioProcessor:
 
     def _safe_matmul(self, A: torch.Tensor, B: torch.Tensor) -> torch.Tensor:
         """
-        Apply matrix multiplication using sum() and element-wise ops.
+        Apply matrix multiplication using sum() and broadcasting.
         Bypasses hipblas/matmul.
         A: (M, K), B: (K, N) -> Output: (M, N)
         """
-        # Optimized for small M (n_mels or n_mfcc)
-        results = []
-        for i in range(A.shape[0]):
-            # Sum over K dimension
-            row_res = torch.sum(A[i].unsqueeze(1) * B, dim=0)
-            results.append(row_res)
-        return torch.stack(results)
+        # Fully vectorized: (M, K, 1) * (1, K, N) -> (M, K, N)
+        # Then sum over K dimension (dim=1)
+        return torch.sum(A.unsqueeze(2) * B.unsqueeze(0), dim=1)
 
     def extract_features(self, signal: torch.Tensor) -> torch.Tensor:
         """Extract MFCCs using pure Torch or SafeGEMM bypass."""

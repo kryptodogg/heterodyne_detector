@@ -52,7 +52,24 @@ class PlutoRadarInterface:
         loop = asyncio.get_event_loop()
         try:
             await loop.run_in_executor(None, self._connect_hardware)
-            print("✅ Pluto+ 2TX2RX Hardware Interface Connected")
+            # Set Gains
+            self.sdr.gain_control_mode_chan0 = 'manual'
+            self.sdr.gain_control_mode_chan1 = 'manual'
+            self.sdr.rx_hardwaregain_chan0 = 50
+            self.sdr.rx_hardwaregain_chan1 = 50
+            
+            # --- Pilot Tone Transmission (2TX) ---
+            # Generate unique tones for TX1 and TX2
+            N_tx = 2**14
+            t_tx = np.arange(N_tx) / self.sample_rate
+            tx1_pilot = np.exp(1j * 2 * np.pi * 100e3 * t_tx).astype(np.complex64)
+            tx2_pilot = np.exp(1j * 2 * np.pi * -200e3 * t_tx).astype(np.complex64)
+            
+            # Send to cyclic buffer
+            self.sdr.tx([tx1_pilot * 10000, tx2_pilot * 10000])
+            
+            self.channels = 2
+            print("✅ Pluto+ 2TX2RX Hardware Interface Connected (Pilots Active)")
             return True
         except Exception as e:
             print(f"❌ Pluto connection failed: {e}")

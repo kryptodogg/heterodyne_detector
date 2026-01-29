@@ -554,8 +554,6 @@ class RadarApp:
         """Run heterodyne detection on dedicated CUDA stream."""
         with torch.cuda.stream(self.stream_detection):
             result = self.detector.detect(rx1, rx2)
-            # Synchronize stream to ensure completion
-            self.stream_detection.synchronize()
         await asyncio.sleep(0)  # Yield control to event loop
         return result
 
