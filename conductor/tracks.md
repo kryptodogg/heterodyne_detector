@@ -4,5 +4,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: Refactor Core Pipeline for Torch-First Performance**
+- [~] **Track: Refactor Core Pipeline for Torch-First Performance**
   *Link: [./tracks/refactor_pipeline_20260128/](./tracks/refactor_pipeline_20260128/)*

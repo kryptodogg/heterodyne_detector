@@ -1,13 +1,7 @@
 #!/usr/bin/env python3
 """
 audio_processor.py - Radar-optimized audio processing (MFCCs)
-Expert implementation using torchaudio and pure PyTorch.
-
-Features:
-- torchaudio-based MFCC extraction
-- Voice quality metrics (Spectral Centroid, Formant Ratio)
-- Pitch contour extraction
-- Activity signature extraction
+Expert implementation using torchaudio with SafeGEMM bypass for ROCm stability.
 """
 
 import numpy as np
@@ -18,8 +12,8 @@ from typing import Optional, Dict
 
 class AudioProcessor:
     """
-    Expert Acoustic Feature Extractor for heterodyned radar signals.
-    Utilizes torchaudio for GPU-accelerated spectral processing.
+    Expert Acoustic Feature Extractor.
+    Includes 'SafeGEMM' logic to bypass failing hipblas/matmul on some ROCm environments.
     """
     
     def __init__(
@@ -39,10 +33,11 @@ class AudioProcessor:
         
         # Convert seconds to samples
         self.hop_length = int(hop_length * sample_rate)
-        self.n_win = int(window_size * sample_rate)
         
-        # Initialize torchaudio MFCC transform
-        # n_mels should be >= n_mfcc, standard is 40 or 128
+        # Test matmul for SafeGEMM decision
+        self.use_safe_gemm = self._check_matmul_broken()
+        
+        # Standard transform (for CPU or working GPU)
         self.mfcc_transform = T.MFCC(
             sample_rate=self.sample_rate,
             n_mfcc=self.n_mfcc,
@@ -56,52 +51,97 @@ class AudioProcessor:
                 "power": 2.0,
             }
         ).to(self.device)
+        
+        # Pre-allocate SafeGEMM buffers if needed
+        if self.use_safe_gemm:
+            self._setup_safe_gemm()
+
+    def _check_matmul_broken(self):
+        if self.device.type != 'cuda': return False
+        try:
+            torch.matmul(torch.randn(2, 2, device=self.device), 
+                         torch.randn(2, 2, device=self.device))
+            return False
+        except:
+            print("⚠️  AudioProcessor: Detected broken matmul, enabling SafeGEMM bypass.")
+            return True
+
+    def _setup_safe_gemm(self):
+        """Prepare Mel filters and DCT matrix for manual application."""
+        # Extract internal filters from torchaudio
+        self.mel_fb = self.mfcc_transform.MelSpectrogram.mel_scale.fb.T.to(self.device) # (40, bins)
+        # DCT Matrix (II)
+        n_mels = 40
+        n_mfcc = self.n_mfcc
+        dct_mat = np.zeros((n_mfcc, n_mels))
+        for k in range(n_mfcc):
+            for n in range(n_mels):
+                dct_mat[k, n] = np.cos(np.pi * k * (n + 0.5) / n_mels)
+        self.dct_mat = torch.tensor(dct_mat, dtype=torch.float32, device=self.device)
+
+    def _safe_matmul(self, A: torch.Tensor, B: torch.Tensor) -> torch.Tensor:
+        """
+        Apply matrix multiplication using sum() and element-wise ops.
+        Bypasses hipblas/matmul.
+        A: (M, K), B: (K, N) -> Output: (M, N)
+        """
+        # Optimized for small M (n_mels or n_mfcc)
+        results = []
+        for i in range(A.shape[0]):
+            # Sum over K dimension
+            row_res = torch.sum(A[i].unsqueeze(1) * B, dim=0)
+            results.append(row_res)
+        return torch.stack(results)
 
     def extract_features(self, signal: torch.Tensor) -> torch.Tensor:
-        """
-        Main entry point for RadarApp. Extracts MFCCs using torchaudio.
-        """
+        """Extract MFCCs using pure Torch or SafeGEMM bypass."""
         if not isinstance(signal, torch.Tensor):
             signal = torch.tensor(signal, dtype=torch.float32, device=self.device)
         
-        # Real signal check
         if signal.is_complex():
-            signal = torch.abs(signal)
+            signal = torch.abs(signal).to(torch.float32)
+        else:
+            signal = signal.to(torch.float32)
             
-        # Ensure signal has channel dimension for torchaudio [batch, channel, time] or [channel, time]
         if signal.ndim == 1:
             signal = signal.unsqueeze(0)
             
-        # MFCC extraction
-        mfcc = self.mfcc_transform(signal)
+        if not self.use_safe_gemm:
+            return self.mfcc_transform(signal).squeeze(0)
         
-        # Squeeze back if we added a dimension
-        return mfcc.squeeze(0)
+        # --- SafeGEMM Pipeline ---
+        # 1. Spectrogram
+        spec = self.mfcc_transform.MelSpectrogram.spectrogram(signal).squeeze(0) # (bins, frames)
+        
+        # 2. Mel Scale (Manual Matmul)
+        mel_spec = self._safe_matmul(self.mel_fb, spec)
+        mel_spec_db = 20 * torch.log10(mel_spec + 1e-9)
+        
+        # 3. DCT (Manual Matmul)
+        mfcc = self._safe_matmul(self.dct_mat, mel_spec_db)
+        
+        return mfcc
 
     def extract_voice_quality_metrics(self, signal: torch.Tensor) -> Dict[str, float]:
-        """
-        Estimate speech-likeness and quality (Spectral Centroid, Formant Ratio).
-        """
+        """Estimate speech-likeness and quality."""
         if not isinstance(signal, torch.Tensor):
             signal = torch.tensor(signal, dtype=torch.float32, device=self.device)
         
         if signal.is_complex():
             signal = torch.abs(signal)
 
-        # Compute spectrum
         spec = torch.abs(torch.fft.rfft(signal, n=self.n_fft))
         freqs = torch.fft.rfftfreq(self.n_fft, 1.0 / self.sample_rate).to(self.device)
 
-        # Spectral centroid (center of mass)
         spec_centroid = torch.sum(freqs * spec) / (torch.sum(spec) + 1e-9)
-
-        # Formant-likeness: ratio near typical human formants [700, 1220, 2600]
+        
+        # Formant ratio logic
         formants = [700, 1220, 2600]
         formant_power = 0
+        bin_size = self.sample_rate / self.n_fft
         for f in formants:
-            idx = int(f / (self.sample_rate / self.n_fft))
-            if idx < len(spec):
-                formant_power += spec[idx]
+            idx = int(f / bin_size)
+            if idx < len(spec): formant_power += spec[idx]
 
         total_power = torch.sum(spec)
         formant_ratio = formant_power / (total_power + 1e-9)
@@ -110,19 +150,4 @@ class AudioProcessor:
             'spectral_centroid_hz': float(spec_centroid.cpu().item()),
             'formant_ratio': float(formant_ratio.cpu().item()),
             'voice_likeness_score': float((formant_ratio * 10).cpu().item())
-        }
-
-    def extract_activity_signature(self, signal: torch.Tensor) -> Dict[str, torch.Tensor]:
-        """
-        Extract activity features (RMS, ZCR) for classification.
-        """
-        # RMS Energy
-        rms = torch.sqrt(torch.mean(signal**2))
-        
-        # Zero Crossing Rate
-        zcr = torch.sum(torch.abs(torch.sign(signal[1:]) - torch.sign(signal[:-1]))) / (2 * len(signal))
-        
-        return {
-            'rms_energy': rms,
-            'zero_crossing_rate': zcr
         }

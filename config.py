@@ -276,17 +276,63 @@ DETECTION = {
 # ============================================================
 
 def get_torch_geometry(device=None):
+
     """
+
     Convert RADAR_GEOMETRY to Torch tensors on specified device.
-    """
-    if device is None:
-        device = torch.device('cpu')
+
+    
+
+    Args:
+
+        device: torch.device (default: CPU)
+
         
+
+    Returns:
+
+        dict: Geometry with positions as torch.Tensor
+
+    """
+
+    if device is None:
+
+        device = torch.device('cpu')
+
+        
+
     torch_geo = {}
+
     for key in ['TX1', 'TX2', 'RX1', 'RX2']:
-        torch_geo[key] = torch.tensor(
-            RADAR_GEOMETRY[key]['position'], 
-            dtype=torch.float32, 
-            device=device
-        )
+
+        torch_geo[key] = {
+
+            'position': torch.tensor(
+
+                RADAR_GEOMETRY[key]['position'], 
+
+                dtype=torch.float32, 
+
+                device=device
+
+            ),
+
+            'orientation': RADAR_GEOMETRY[key]['orientation'].copy(),
+
+            'gain_db': RADAR_GEOMETRY[key].get('gain_db', 0.0),
+
+            'power_dbm': RADAR_GEOMETRY[key].get('power_dbm', 0.0)
+
+        }
+
+        
+
+    # Add array properties
+
+    torch_geo['array_type'] = RADAR_GEOMETRY['array_type']
+
+    torch_geo['wavelength'] = RADAR_GEOMETRY.get('wavelength', 0.125)
+
+    
+
     return torch_geo

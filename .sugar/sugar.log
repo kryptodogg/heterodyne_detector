@@ -1,0 +1,28 @@
+2026-01-28 18:39:15,294 - sugar.storage.task_type_manager - INFO - Created task_types table and populated with default types
+2026-01-28 18:39:15,337 - sugar.storage.work_queue - INFO - Added orchestrate column to existing database
+2026-01-28 18:39:15,345 - sugar.storage.work_queue - INFO - Added parent_task_id column to existing database
+2026-01-28 18:39:15,355 - sugar.storage.work_queue - INFO - Added stage column to existing database
+2026-01-28 18:39:15,364 - sugar.storage.work_queue - INFO - Added blocked_by column to existing database
+2026-01-28 18:39:15,372 - sugar.storage.work_queue - INFO - Added context_path column to existing database
+2026-01-28 18:39:15,382 - sugar.storage.work_queue - INFO - Added assigned_agent column to existing database
+2026-01-28 18:39:15,399 - sugar.storage.work_queue - INFO - Added acceptance_criteria column to existing database
+2026-01-28 18:39:15,408 - sugar.storage.work_queue - INFO - Added verification_required column to existing database
+2026-01-28 18:39:15,416 - sugar.storage.work_queue - INFO - Added verification_status column to existing database
+2026-01-28 18:39:15,426 - sugar.storage.work_queue - INFO - Added verification_results column to existing database
+2026-01-28 18:39:15,434 - sugar.storage.work_queue - INFO - Added thinking_log_path column to existing database
+2026-01-28 18:39:15,443 - sugar.storage.work_queue - INFO - Added thinking_summary column to existing database
+2026-01-28 18:39:15,452 - sugar.storage.work_queue - INFO - Added thinking_stats column to existing database
+2026-01-28 18:39:21,353 - sugar.core.loop - INFO - 🚀 Using Agent SDK executor (v3.0)
+2026-01-28 18:39:21,642 - sugar.discovery.github_watcher - INFO - 🔑 GitHub CLI available and authenticated
+2026-01-28 18:39:21,642 - sugar.discovery.github_watcher - INFO - ✅ GitHub watcher initialized for kryptodogg/heterodyne_detector using GitHub CLI
+2026-01-28 18:39:21,643 - sugar.main - INFO - 🚀 Starting Sugar ✨ 🍰 ✨  Autonomous development assistant v3.8.0 in continuous mode...
+2026-01-28 18:39:21,643 - sugar.main - INFO - 💡 Press Ctrl+C to stop Sugar gracefully
+2026-01-28 18:39:21,643 - sugar.main - INFO - 💡 Or run 'sugar stop' from another terminal
+2026-01-28 18:39:21,643 - sugar.main - INFO - 💡 Or run 'sugar stop --force' to force immediate termination
+2026-01-28 18:39:21,643 - sugar.core.loop - INFO - 🤖 Starting Sugar ✨ 🍰 ✨  Autonomous development assistant v3.8.0
+2026-01-28 18:39:21,645 - sugar.core.loop - INFO - 🔄 Starting Sugar cycle at 2026-01-29 00:39:21.645007+00:00
+2026-01-28 18:39:21,648 - sugar.discovery.error_monitor - INFO - Generated 3 maintenance tasks
+2026-01-28 18:39:22,454 - sugar.core.loop - INFO - ➕ Added 19 new work items to queue
+2026-01-28 18:39:22,454 - sugar.core.loop - INFO - ⏭️ Skipped 2 duplicate work items
+2026-01-28 18:39:22,464 - sugar.core.loop - INFO - ⚡ Executing work [ab636940-7116-43c6-a593-d59bae889956]: Code review and optimization for frequency_sweep.py
+2026-01-28 18:39:22,464 - sugar.executor.agent_sdk_executor - INFO - DRY RUN: Simulating execution of Code review and optimization for frequency_sweep.py

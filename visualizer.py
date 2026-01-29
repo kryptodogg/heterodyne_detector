@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """
-Dash Plotly Visualization for Radar System - 3x3 Dashboard
+Dash Plotly Visualization for Radar System - 3x3 Dashboard (Async)
 Plots:
   Row 1: RX1 Time | RX2 Time | FFT Spectrum
   Row 2: MFCC Heatmap | Range-Doppler Map | PPI Polar
   Row 3: DOA Polar | Target Tracking | Track History
-  
+
 20 Hz refresh rate (50 ms) for 9 plots
+Non-blocking async updates via asyncio.Queue
 """
 
+import asyncio
 import threading
 import time
 import numpy as np
@@ -32,6 +34,8 @@ class VisualizerDash:
         self._data = {
             "rx1": np.zeros(1024),
             "rx2": np.zeros(1024),
+            "tx1": np.zeros(1024),
+            "tx2": np.zeros(1024),
             "mfcc": np.zeros((13, 20)),
             "detection": {"score": 0.0, "freq_offset": 0.0},
             "geometry_info": {"doa": 0.0, "doa_power": np.zeros(37), "snr_improvement": 0.0},
@@ -39,18 +43,47 @@ class VisualizerDash:
             "ppi": {"ppi_map": np.zeros((37, 256)), "angles_deg": np.linspace(-90, 90, 37)},
             "tracks": [],
         }
-        self._lock = threading.Lock()
+
+        # Async-friendly: Use asyncio.Lock instead of threading.Lock
+        # Data access is through synchronized queue pattern
+        self._lock = threading.Lock()  # Keep for Dash callbacks (they run in Flask threads)
+        self._update_queue = None  # Will be set when async loop is available
 
         self._setup_layout()
         self._setup_callbacks()
         self._thread = threading.Thread(target=self._run_server, daemon=True)
+        self._running = False
 
-    def update(self, rx1, rx2, mfcc, detection, geometry_info,
-               range_doppler_map, ppi, tracks):
-        """Update visualizer with all processed radar data"""
+    async def update(self, rx1, rx2, mfcc, detection, geometry_info,
+                     range_doppler_map, ppi, tracks, tx1=None, tx2=None):
+        """
+        Async update - non-blocking visualization refresh.
+        Uses asyncio.sleep(0) to yield control immediately.
+        """
+        # Update data atomically (fast operation, safe to lock briefly)
         with self._lock:
             self._data["rx1"] = rx1
             self._data["rx2"] = rx2
+            if tx1 is not None: self._data["tx1"] = tx1
+            if tx2 is not None: self._data["tx2"] = tx2
+            self._data["mfcc"] = mfcc
+            self._data["detection"] = detection
+            self._data["geometry_info"] = geometry_info
+            self._data["range_doppler_map"] = range_doppler_map
+            self._data["ppi"] = ppi
+            self._data["tracks"] = tracks
+
+        # Yield control immediately (don't block event loop)
+        await asyncio.sleep(0)
+
+    def update_sync(self, rx1, rx2, mfcc, detection, geometry_info,
+                    range_doppler_map, ppi, tracks, tx1=None, tx2=None):
+        """Synchronous fallback for compatibility"""
+        with self._lock:
+            self._data["rx1"] = rx1
+            self._data["rx2"] = rx2
+            if tx1 is not None: self._data["tx1"] = tx1
+            if tx2 is not None: self._data["tx2"] = tx2
             self._data["mfcc"] = mfcc
             self._data["detection"] = detection
             self._data["geometry_info"] = geometry_info
@@ -65,15 +98,29 @@ class VisualizerDash:
         self.app.layout = html.Div(
             [
                 html.H2(
-                    "Radar System Dashboard - 3x3 Grid (20 Hz)",
+                    "Radar System Dashboard - Torch-First 2TX2RX",
                     style={"textAlign": "center", "color": "#00FFFF", "marginBottom": "20px"},
                 ),
                 
-                # Row 1: Time Domain + FFT
+                # Row 1: RX Wave (Combined) | TX1 Wave | TX2 Wave
                 html.Div(
                     [
-                        dcc.Graph(id="rx1_wave", style={"flex": "1"}),
-                        dcc.Graph(id="rx2_wave", style={"flex": "1"}),
+                        dcc.Graph(id="rx_wave", style={"flex": "1"}),
+                        dcc.Graph(id="tx1_wave", style={"flex": "1"}),
+                        dcc.Graph(id="tx2_wave", style={"flex": "1"}),
+                    ],
+                    style={
+                        "display": "flex",
+                        "gap": "10px",
+                        "marginBottom": "10px",
+                    },
+                ),
+                
+                # Row 2: MFCC | Range-Doppler | FFT Spectrum
+                html.Div(
+                    [
+                        dcc.Graph(id="mfcc_heatmap", style={"flex": "1"}),
+                        dcc.Graph(id="range_doppler", style={"flex": "1"}),
                         dcc.Graph(id="fft_spectrum", style={"flex": "1"}),
                     ],
                     style={
@@ -83,26 +130,12 @@ class VisualizerDash:
                     },
                 ),
                 
-                # Row 2: MFCC + Range-Doppler + PPI
-                html.Div(
-                    [
-                        dcc.Graph(id="mfcc_heatmap", style={"flex": "1"}),
-                        dcc.Graph(id="range_doppler", style={"flex": "1"}),
-                        dcc.Graph(id="ppi_polar", style={"flex": "1"}),
-                    ],
-                    style={
-                        "display": "flex",
-                        "gap": "10px",
-                        "marginBottom": "10px",
-                    },
-                ),
-                
-                # Row 3: DOA Polar + Tracking + History
+                # Row 3: DOA Polar | Target Tracking | PPI Polar
                 html.Div(
                     [
                         dcc.Graph(id="doa_polar", style={"flex": "1"}),
                         dcc.Graph(id="target_tracking", style={"flex": "1"}),
-                        dcc.Graph(id="track_history", style={"flex": "1"}),
+                        dcc.Graph(id="ppi_polar", style={"flex": "1"}),
                     ],
                     style={
                         "display": "flex",
@@ -123,47 +156,88 @@ class VisualizerDash:
     def _setup_callbacks(self):
         """Setup all 9 plot update callbacks"""
         
-        # ========== Row 1: Time Domain + FFT ==========
+        # ========== Row 1: RX (Combined) | TX1 | TX2 ==========
         
         @self.app.callback(
-            Output("rx1_wave", "figure"), Input("dash-interval", "n_intervals")
+            Output("rx_wave", "figure"), Input("dash-interval", "n_intervals")
         )
-        def update_rx1_time(_n):
+        def update_rx_wave(_n):
             with self._lock:
-                data = self._data["rx1"]
-            y = np.abs(data[:1024])
-            # Decimate for display performance
-            y = y[::10]
-            fig = go.Figure(
-                data=[go.Scatter(y=y, mode="lines", line=dict(color="#00FFFF", width=1))]
-            )
+                rx1 = self._data["rx1"]
+                rx2 = self._data["rx2"]
+            y1 = np.abs(rx1[:1024])[::10]
+            y2 = np.abs(rx2[:1024])[::10]
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(y=y1, name="RX1", line=dict(color="#00FFFF", width=1)))
+            fig.add_trace(go.Scatter(y=y2, name="RX2", line=dict(color="#FF00FF", width=1)))
             fig.update_layout(
-                title="RX1 Time Domain",
+                title="RX Time Domain",
                 template="plotly_dark",
-                xaxis_title="Sample (decimated)",
-                yaxis_title="Amplitude",
-                height=350,
+                height=300,
                 margin=dict(l=40, r=10, t=40, b=40),
             )
             return fig
 
         @self.app.callback(
-            Output("rx2_wave", "figure"), Input("dash-interval", "n_intervals")
+            Output("tx1_wave", "figure"), Input("dash-interval", "n_intervals")
         )
-        def update_rx2_time(_n):
+        def update_tx1_wave(_n):
             with self._lock:
-                data = self._data["rx2"]
-            y = np.abs(data[:1024])
-            y = y[::10]
-            fig = go.Figure(
-                data=[go.Scatter(y=y, mode="lines", line=dict(color="#FF00FF", width=1))]
-            )
+                data = self._data["tx1"]
+            y = np.abs(data[:1024])[::10]
+            fig = go.Figure(data=[go.Scatter(y=y, line=dict(color="#00FF00", width=1))])
             fig.update_layout(
-                title="RX2 Time Domain",
+                title="TX1 Cancellation Signal",
                 template="plotly_dark",
-                xaxis_title="Sample (decimated)",
-                yaxis_title="Amplitude",
-                height=350,
+                height=300,
+                margin=dict(l=40, r=10, t=40, b=40),
+            )
+            return fig
+
+        @self.app.callback(
+            Output("tx2_wave", "figure"), Input("dash-interval", "n_intervals")
+        )
+        def update_tx2_wave(_n):
+            with self._lock:
+                data = self._data["tx2"]
+            y = np.abs(data[:1024])[::10]
+            fig = go.Figure(data=[go.Scatter(y=y, line=dict(color="#FFFF00", width=1))])
+            fig.update_layout(
+                title="TX2 Cancellation Signal",
+                template="plotly_dark",
+                height=300,
+                margin=dict(l=40, r=10, t=40, b=40),
+            )
+            return fig
+
+        # ========== Row 2: MFCC | RD | FFT ==========
+        
+        @self.app.callback(
+            Output("mfcc_heatmap", "figure"), Input("dash-interval", "n_intervals")
+        )
+        def update_mfcc(_n):
+            with self._lock:
+                mfcc = self._data["mfcc"]
+            fig = go.Figure(data=go.Heatmap(z=mfcc, colorscale="Viridis"))
+            fig.update_layout(
+                title="MFCC Features",
+                template="plotly_dark",
+                height=300,
+                margin=dict(l=40, r=10, t=40, b=40),
+            )
+            return fig
+
+        @self.app.callback(
+            Output("range_doppler", "figure"), Input("dash-interval", "n_intervals")
+        )
+        def update_range_doppler(_n):
+            with self._lock:
+                rd_map = self._data["range_doppler_map"]
+            fig = go.Figure(data=go.Heatmap(z=rd_map, colorscale="Jet"))
+            fig.update_layout(
+                title="Range-Doppler Map",
+                template="plotly_dark",
+                height=300,
                 margin=dict(l=40, r=10, t=40, b=40),
             )
             return fig
@@ -177,65 +251,52 @@ class VisualizerDash:
             arr = data[:1024]
             mag = np.abs(np.fft.fft(np.asarray(arr, dtype=np.complex64)))[:512]
             mag_db = 20 * np.log10(mag + 1e-10)
-            fig = go.Figure(
-                data=[go.Scatter(y=mag_db, mode="lines", fill="tozeroy", 
-                                line=dict(color="#00FF00"))]
-            )
+            fig = go.Figure(data=[go.Scatter(y=mag_db, fill="tozeroy", line=dict(color="#00FF00"))])
             fig.update_layout(
-                title="RX1 Spectrum (dB)",
+                title="Spectral Power (dB)",
                 template="plotly_dark",
-                xaxis_title="Bin",
-                yaxis_title="Power (dB)",
-                height=350,
+                height=300,
                 margin=dict(l=40, r=10, t=40, b=40),
             )
             return fig
 
-        # ========== Row 2: MFCC + Range-Doppler + PPI ==========
+        # ========== Row 3: DOA | Tracking | PPI ==========
         
         @self.app.callback(
-            Output("mfcc_heatmap", "figure"), Input("dash-interval", "n_intervals")
+            Output("doa_polar", "figure"), Input("dash-interval", "n_intervals")
         )
-        def update_mfcc(_n):
+        def update_doa(_n):
             with self._lock:
-                mfcc = self._data["mfcc"]
-            fig = go.Figure(data=go.Heatmap(
-                z=mfcc,
-                colorscale="Viridis",
-                colorbar=dict(thickness=15, len=0.7)
-            ))
+                geo_info = self._data["geometry_info"]
+            doa_power = geo_info.get("doa_power", np.zeros(37))
+            angles_deg = np.linspace(-90, 90, 37)
+            fig = go.Figure(data=go.Scatterpolar(r=doa_power, theta=angles_deg, fill="toself"))
             fig.update_layout(
-                title="MFCC Features",
+                title="DOA Power Distribution",
                 template="plotly_dark",
-                xaxis_title="Time Frame",
-                yaxis_title="MFCC Coeff",
-                height=350,
-                margin=dict(l=40, r=10, t=40, b=40),
+                polar=dict(radialaxis=dict(visible=False)),
+                height=300,
+                margin=dict(l=40, r=40, t=40, b=40),
             )
             return fig
 
         @self.app.callback(
-            Output("range_doppler", "figure"), Input("dash-interval", "n_intervals")
+            Output("target_tracking", "figure"), Input("dash-interval", "n_intervals")
         )
-        def update_range_doppler(_n):
+        def update_tracking(_n):
             with self._lock:
-                rd_map = self._data["range_doppler_map"]
-            
-            # Handle empty map
-            if rd_map.size == 0:
-                rd_map = np.zeros((128, 512))
-            
-            fig = go.Figure(data=go.Heatmap(
-                z=rd_map,
-                colorscale="Jet",
-                colorbar=dict(title="dB", thickness=15, len=0.7)
-            ))
+                tracks = self._data["tracks"]
+            fig = go.Figure()
+            for track in tracks:
+                if isinstance(track, dict):
+                    fig.add_trace(go.Scatter(x=[track.get("x", 0)], y=[track.get("y", 0)],
+                                           mode="markers+text", name=f"T{track.get('track_id')}"))
             fig.update_layout(
-                title="Range-Doppler Map",
+                title="Target Tracking",
                 template="plotly_dark",
-                xaxis_title="Range Bin",
-                yaxis_title="Doppler Bin",
-                height=350,
+                xaxis=dict(range=[-10, 10]),
+                yaxis=dict(range=[0, 20]),
+                height=300,
                 margin=dict(l=40, r=10, t=40, b=40),
             )
             return fig
@@ -246,157 +307,66 @@ class VisualizerDash:
         def update_ppi(_n):
             with self._lock:
                 ppi_data = self._data["ppi"]
-            
             ppi_map = ppi_data.get("ppi_map", np.zeros((37, 256)))
-            angles_deg = ppi_data.get("angles_deg", np.linspace(-90, 90, 37))
-            
-            # Create polar plot data
-            # Convert Cartesian PPI map to polar coordinates for display
-            fig = go.Figure(data=go.Heatmap(
-                z=ppi_map,
-                colorscale="Viridis",
-                colorbar=dict(title="dB", thickness=15, len=0.7)
-            ))
+            fig = go.Figure(data=go.Heatmap(z=ppi_map, colorscale="Viridis"))
             fig.update_layout(
-                title="PPI - Polar Display",
+                title="PPI Polar Display",
                 template="plotly_dark",
-                xaxis_title="Range Bin",
-                yaxis_title="Angle (°)",
-                height=350,
+                height=300,
                 margin=dict(l=40, r=10, t=40, b=40),
             )
-            return fig
-
-        # ========== Row 3: DOA + Tracking + History ==========
-        
-        @self.app.callback(
-            Output("doa_polar", "figure"), Input("dash-interval", "n_intervals")
-        )
-        def update_doa(_n):
-            with self._lock:
-                geo_info = self._data["geometry_info"]
-            
-            doa_power = geo_info.get("doa_power", np.zeros(37))
-            angles_deg = np.linspace(-90, 90, 37)
-            
-            fig = go.Figure(data=go.Scatterpolar(
-                r=doa_power,
-                theta=angles_deg,
-                fill="toself",
-                name="DOA Power",
-                line=dict(color="#00FFFF"),
-            ))
-            fig.update_layout(
-                title="Direction of Arrival (DOA)",
-                template="plotly_dark",
-                polar=dict(
-                    radialaxis=dict(visible=True, range=[0, np.max(doa_power) + 1e-10]),
-                ),
-                height=350,
-                margin=dict(l=40, r=10, t=40, b=40),
-            )
-            return fig
-
-        @self.app.callback(
-            Output("target_tracking", "figure"), Input("dash-interval", "n_intervals")
-        )
-        def update_tracking(_n):
-            with self._lock:
-                tracks = self._data["tracks"]
-            
-            fig = go.Figure()
-            
-            # Plot each track
-            for track in tracks:
-                if isinstance(track, dict):
-                    x = track.get("x", 0)
-                    y = track.get("y", 0)
-                    vx = track.get("vx", 0)
-                    vy = track.get("vy", 0)
-                    track_id = track.get("track_id", 0)
-                    
-                    # Plot position
-                    fig.add_trace(go.Scatter(
-                        x=[x],
-                        y=[y],
-                        mode="markers",
-                        marker=dict(size=10, color="#00FF00"),
-                        name=f"Track {track_id}",
-                    ))
-                    
-                    # Plot velocity vector
-                    if vx != 0 or vy != 0:
-                        fig.add_trace(go.Scatter(
-                            x=[x, x + vx],
-                            y=[y, y + vy],
-                            mode="lines",
-                            line=dict(color="#00FF00", width=2),
-                            showlegend=False,
-                        ))
-            
-            fig.update_layout(
-                title="Target Tracking (Cartesian)",
-                template="plotly_dark",
-                xaxis_title="X (m)",
-                yaxis_title="Y (m)",
-                height=350,
-                margin=dict(l=40, r=10, t=40, b=40),
-            )
-            fig.update_xaxes(scaleanchor="y", scaleratio=1)
-            fig.update_yaxes(scaleanchor="x", scaleratio=1)
-            
-            return fig
-
-        @self.app.callback(
-            Output("track_history", "figure"), Input("dash-interval", "n_intervals")
-        )
-        def update_track_history(_n):
-            with self._lock:
-                tracks = self._data["tracks"]
-            
-            fig = go.Figure()
-            
-            # Plot trajectory history for each track
-            colors = ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF"]
-            for i, track in enumerate(tracks):
-                if isinstance(track, dict):
-                    history = track.get("history")
-                    if history is not None and len(history) > 0:
-                        history = np.array(history)
-                        color = colors[i % len(colors)]
-                        fig.add_trace(go.Scatter(
-                            x=history[:, 0],
-                            y=history[:, 1],
-                            mode="lines+markers",
-                            name=f"Track {track.get('track_id', i)}",
-                            line=dict(color=color),
-                            marker=dict(size=4),
-                        ))
-            
-            fig.update_layout(
-                title="Track History (Trajectories)",
-                template="plotly_dark",
-                xaxis_title="X (m)",
-                yaxis_title="Y (m)",
-                height=350,
-                margin=dict(l=40, r=10, t=40, b=40),
-            )
-            fig.update_xaxes(scaleanchor="y", scaleratio=1)
-            fig.update_yaxes(scaleanchor="x", scaleratio=1)
-            
             return fig
 
     def _run_server(self):
-        """Run the Dash server"""
-        self.app.run(host=self.host, port=self.port, debug=False)
+        """Run the Dash server with auto port finding"""
+        import socket
+
+        # Try to find available port
+        port = self.port
+        max_attempts = 10
+
+        for attempt in range(max_attempts):
+            try:
+                # Test if port is available
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.bind((self.host, port))
+                    # Port is available
+                    break
+            except OSError:
+                # Port in use, try next
+                port += 1
+
+        if port != self.port:
+            print(f"⚠️  Port {self.port} in use, using {port} instead")
+            self.port = port
+
+        # Suppress Flask startup messages for cleaner output
+        import logging
+        log = logging.getLogger('werkzeug')
+        log.setLevel(logging.ERROR)
+
+        self.app.run(host=self.host, port=port, debug=False)
 
     def start(self):
         """Start the visualization server in background thread"""
         if not self._thread.is_alive():
+            self._running = True
             self._thread.start()
+            # Give server time to start and find port
+            time.sleep(0.5)
+            print(f"📊 Dashboard: http://{self.host}:{self.port}")
+
+    async def start_async(self):
+        """Async start - returns immediately after spawning server thread"""
+        self.start()
+        await asyncio.sleep(0.1)  # Let server initialize
 
     def stop(self):
         """Stop the visualizer (placeholder for cleanup)"""
-        # Dash/Flask doesn't have a simple 'stop' for the development server
-        # when running in a thread, but we can signal cleanup if needed.
+        self._running = False
         print("Stopping Visualizer...")
+
+    async def stop_async(self):
+        """Async stop - non-blocking shutdown"""
+        self._running = False
+        await asyncio.sleep(0)

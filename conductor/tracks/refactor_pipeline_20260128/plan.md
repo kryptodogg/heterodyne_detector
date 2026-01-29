@@ -35,4 +35,8 @@
     - [x] Replace basic heterodyning with multi-stage downconversion
 - [x] Task: Enhance `noise_canceller.py` with adaptive notch filtering [commit: 5415dd5]
     - [x] Implement frequency-domain tonal interference removal
+- [x] Task: Stabilization and GPU Health Check [commit: a03b520]
+    - [x] Implement matmul health check in `RadarApp`
+    - [x] Fix tensor broadcasting in MVDR beamformer
+    - [x] Sync visualization IDs and callbacks
 - [ ] Task: Conductor - User Manual Verification 'Phase 5: Expert Signal Processing Techniques' (Protocol in workflow.md)
