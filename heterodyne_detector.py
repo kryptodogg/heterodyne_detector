@@ -7,7 +7,10 @@ Pure PyTorch implementation for GPU acceleration.
 
 import numpy as np
 import torch
-import iio
+try:
+    import iio
+except Exception:
+    iio = None
 import threading
 import queue
 import time
@@ -73,8 +76,10 @@ class HeterodyneDetector:
         self.device = torch.device(device) if isinstance(device, str) else device
         
         # Expert Heterodyner
+        # Note: Input signal is already baseband (downconverted by SDR), so rf_freq_hz should be 0
+        # to avoid double-shifting.
         self.heterodyner = RadioToAcousticHeterodyner(
-            rf_freq_hz=center_freq,
+            rf_freq_hz=0.0,
             target_audio_freq_hz=500.0, # Target audible range
             sample_rate_hz=sample_rate,
             device=self.device
