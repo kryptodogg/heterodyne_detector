@@ -180,3 +180,36 @@ Generated with Sugar ✨ 🍰 ✨  Autonomous development assistant v3.8.0
 2026-01-28 18:59:25,822 - sugar.core.loop - INFO - ✅ Work completed [b71a035e-9a0b-42cb-8623-a515b20bea78]: Review and improve documentation in test_radar_app.py
 2026-01-28 18:59:25,874 - sugar.core.loop - INFO - ⚡ Executing work [3efa948e-ccc8-41e0-abbb-d0db9bd25f4c]: Code review and optimization for bluetooth_handler.py
 2026-01-28 18:59:25,874 - sugar.executor.agent_sdk_executor - INFO - DRY RUN: Simulating execution of Code review and optimization for bluetooth_handler.py
+2026-01-28 18:59:26,899 - sugar.utils.git_operations - INFO - 📝 Committed changes: chore: Code review and optimization for bluetooth_handler.py
+
+Work ID: 3efa948e-ccc8-41e0-abbb-d0db9bd25f4c
+Generated with Sugar ✨ 🍰 ✨  Autonomous development assistant v3.8.0
+2026-01-28 18:59:26,970 - sugar.workflow.orchestrator - INFO - ✅ Completed direct_commit workflow
+2026-01-28 18:59:27,019 - sugar.core.loop - INFO - ✅ Work completed [3efa948e-ccc8-41e0-abbb-d0db9bd25f4c]: Code review and optimization for bluetooth_handler.py
+2026-01-28 18:59:27,022 - sugar.learning.feedback_processor - INFO - 🧠 Processed feedback from 15 completed and 0 failed tasks
+2026-01-28 18:59:27,022 - sugar.learning.adaptive_scheduler - INFO - 🔼 Increasing priority for complex tasks due to high success rate
+2026-01-28 18:59:27,022 - sugar.learning.adaptive_scheduler - INFO - 🎯 Applied 1 behavioral adaptations
+2026-01-28 18:59:27,023 - sugar.core.loop - INFO - 📊 Queue stats: 15 pending, 15 completed, 0 failed
+2026-01-28 18:59:27,023 - sugar.core.loop - INFO - 🧠 Generated 3 recommendations for system improvement
+2026-01-28 18:59:27,023 - sugar.core.loop - INFO - 🎯 Applied 1 adaptive improvements
+2026-01-28 18:59:27,023 - sugar.core.loop - INFO - ✅ Cycle completed in 4.2s, sleeping 295.8s
+2026-01-28 19:00:49,565 - sugar.main - INFO - 🛑 Shutdown signal received, stopping Sugar...
+2026-01-28 19:00:49,565 - sugar.main - INFO - 🔔 Shutdown event triggered
+2026-01-28 19:00:50,105 - sugar.core.loop - INFO - 🛑 Shutdown detected in sleep loop, exiting...
+2026-01-28 19:00:50,106 - sugar.main - INFO - ⏳ Stopping Sugar gracefully...
+2026-01-28 19:00:50,106 - sugar.core.loop - INFO - 🛑 Stopping Sugar...
+2026-01-28 19:00:50,106 - sugar.main - INFO - 🏁 Sugar stopped
+2026-01-28 19:11:44,525 - sugar.core.loop - INFO - 🚀 Using Agent SDK executor (v3.0)
+2026-01-28 19:11:44,835 - sugar.discovery.github_watcher - INFO - 🔑 GitHub CLI available and authenticated
+2026-01-28 19:11:44,835 - sugar.discovery.github_watcher - INFO - ✅ GitHub watcher initialized for kryptodogg/heterodyne_detector using GitHub CLI
+2026-01-28 19:11:44,836 - sugar.main - INFO - 🚀 Starting Sugar ✨ 🍰 ✨  Autonomous development assistant v3.8.0 in continuous mode...
+2026-01-28 19:11:44,836 - sugar.main - INFO - 💡 Press Ctrl+C to stop Sugar gracefully
+2026-01-28 19:11:44,836 - sugar.main - INFO - 💡 Or run 'sugar stop' from another terminal
+2026-01-28 19:11:44,836 - sugar.main - INFO - 💡 Or run 'sugar stop --force' to force immediate termination
+2026-01-28 19:11:44,836 - sugar.core.loop - INFO - 🤖 Starting Sugar ✨ 🍰 ✨  Autonomous development assistant v3.8.0
+2026-01-28 19:11:44,838 - sugar.core.loop - INFO - 🔄 Starting Sugar cycle at 2026-01-29 01:11:44.838233+00:00
+2026-01-28 19:11:44,841 - sugar.discovery.error_monitor - INFO - Generated 3 maintenance tasks
+2026-01-28 19:11:45,393 - sugar.core.loop - INFO - ➕ Added 2 new work items to queue
+2026-01-28 19:11:45,393 - sugar.core.loop - INFO - ⏭️ Skipped 19 duplicate work items
+2026-01-28 19:11:45,403 - sugar.core.loop - INFO - ⚡ Executing work [ed7e8810-26d9-4a67-87f4-9d8dd2c43056]: Code review and optimization for test_error_recovery.py
+2026-01-28 19:11:45,403 - sugar.executor.agent_sdk_executor - INFO - DRY RUN: Simulating execution of Code review and optimization for test_error_recovery.py
