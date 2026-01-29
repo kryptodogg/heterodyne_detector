@@ -231,23 +231,27 @@ class OptimizedPPIProcessor:
         """
         batch_size = rx1_batch.shape[0]
         num_signals = rx1_batch.shape[1]
-        
+
+        # Ensure inputs are on the correct device
+        rx1_batch = rx1_batch.to(self.device)
+        rx2_batch = rx2_batch.to(self.device)
+
         # Expand signals to match angles
         rx1_expanded = rx1_batch.unsqueeze(1).expand(-1, self.num_angles, -1)  # (batch, angles, N)
         rx2_expanded = rx2_batch.unsqueeze(1).expand(-1, self.num_angles, -1)  # (batch, angles, N)
-        
+
         # Expand steering vectors to match batch
         sv_expanded = self.steering_vectors.unsqueeze(0).expand(batch_size, -1, -1)  # (batch, angles, 4)
-        
+
         # Extract RX components of steering vectors
         sv_rx = sv_expanded[:, :, :2].conj()  # (batch, angles, 2)
-        
+
         # Stack rx signals
         X = torch.stack([rx1_expanded, rx2_expanded], dim=2)  # (batch, angles, 2, N)
-        
+
         # Apply beamforming: sum(sv * X) for each angle
         beamformed = torch.sum(sv_rx.unsqueeze(-1) * X, dim=2)  # (batch, angles, N)
-        
+
         return beamformed
 
     def _mvdr_beamform_batch(self, rx1_batch, rx2_batch):
