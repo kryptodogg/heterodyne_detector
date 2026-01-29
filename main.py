@@ -458,13 +458,14 @@ class RadarApp:
             rx2 = rx2.to(self.device, non_blocking=True)
 
         # Step 1: Spatial noise cancellation (beamforming + LMS active cancellation)
-        # This runs on default stream (stream 0) and must complete first
+        ts = time.time()
         clean_rx1, clean_rx2, cancellation_info = self.noise_canceller.cancel(
             rx1, rx2, tx1_ref=tx1_ref, tx2_ref=tx2_ref
         )
+        t_cancel = time.time() - ts
 
         # Step 2-5: Run independent GPU operations concurrently via CUDA streams
-        # These don't depend on each other and can execute in true parallel
+        ts = time.time()
         if self.device.type == 'cuda':
             # Launch operations on separate streams (TRUE async GPU execution)
             detection_task = asyncio.create_task(
@@ -499,12 +500,19 @@ class RadarApp:
         detection, rd_results, ppi_results, mfcc_features = await asyncio.gather(
             detection_task, rd_task, ppi_task, mfcc_task
         )
+        t_parallel = time.time() - ts
 
         # Step 6: Target tracking (depends on rd_results)
+        ts = time.time()
         tracks = await self._run_tracking(rd_results['detections'])
+        t_track = time.time() - ts
 
         # Step 7: Pattern matching (depends on mfcc_features)
+        ts = time.time()
         matches = await self._run_pattern_matching(mfcc_features)
+        t_pattern = time.time() - ts
+        
+        print(f"\nDEBUG DETAIL: Cancel {t_cancel*1000:.1f}ms, Parallel {t_parallel*1000:.1f}ms, Track {t_track*1000:.1f}ms, Pattern {t_pattern*1000:.1f}ms")
 
         # Step 8: Update statistics
         processing_time = time.time() - start_time
@@ -564,7 +572,6 @@ class RadarApp:
         """Run Range-Doppler processing on dedicated CUDA stream."""
         with torch.cuda.stream(self.stream_range_doppler):
             result = self.rd_processor.process(rx1)
-            self.stream_range_doppler.synchronize()
         await asyncio.sleep(0)
         return result
 
@@ -576,7 +583,6 @@ class RadarApp:
         """Run PPI processing on dedicated CUDA stream."""
         with torch.cuda.stream(self.stream_ppi):
             result = self.ppi_processor.process(rx1, rx2)
-            self.stream_ppi.synchronize()
         await asyncio.sleep(0)
         return result
 
@@ -587,7 +593,6 @@ class RadarApp:
         """Run MFCC extraction on dedicated CUDA stream."""
         with torch.cuda.stream(self.stream_mfcc):
             result = self.audio_proc.extract_features(rx1)
-            self.stream_mfcc.synchronize()
         await asyncio.sleep(0)
         return result
 
@@ -687,10 +692,15 @@ class RadarApp:
                     break
 
                 # Async receive data from SDR (non-blocking I/O)
+                t0 = time.time()
                 rx1, rx2 = await self.sdr.rx()
+                t1 = time.time()
 
                 # Async process buffer (GPU ops run concurrently via CUDA streams)
                 results = await self.process_buffer(rx1, rx2)
+                t2 = time.time()
+                
+                print(f"\rDEBUG: RX took {(t1-t0)*1000:.1f}ms, Proc took {(t2-t1)*1000:.1f}ms", end='')
 
                 # Log significant events (async to avoid blocking)
                 if results['detection']['score'] > DEFAULT_DETECTION_THRESHOLD:
