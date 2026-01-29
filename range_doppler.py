@@ -167,7 +167,7 @@ class RangeDopplerProcessor:
         if self.buffer_idx == 0:  # Buffer just wrapped (filled)
             # Doppler FFT across slow time
             rd_map_complex = torch.fft.fft(self.slow_time_buffer, dim=0, n=self.doppler_fft_size)
-            rd_map = torch.fft.fftshift(torch.abs(rd_map_complex), dims=0)
+            rd_map = torch.fft.fftshift(torch.abs(rd_map_complex), dim=0)
             
             # Convert to dB
             rd_map_db = 20 * torch.log10(rd_map + 1e-10)

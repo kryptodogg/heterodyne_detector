@@ -1,13 +1,13 @@
 import torch
 import numpy as np
-from ppi_processor import OptimizedPPIProcessor
+from ppi_processor import PPIProcessor
 
 
 def test_ppi_on_gpu():
     """
-    Validate the optimized PPI processor on GPU
+    Validate the PPI processor on GPU
     """
-    print("Testing OptimizedPPIProcessor on GPU...")
+    print("Testing PPIProcessor on GPU...")
 
     # Mock geometry class for testing
     class MockGeometry:
@@ -33,7 +33,7 @@ def test_ppi_on_gpu():
     geometry = MockGeometry()
 
     # Initialize processor
-    processor = OptimizedPPIProcessor(geometry, config)
+    processor = PPIProcessor(geometry, config)
 
     # Create test data (simulating 1000 radar samples scenario)
     data_size = 1000
