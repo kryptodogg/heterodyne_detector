@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "cognee-local": {
+      "command": "",
+      "args": [
+        "cd /home/ashiedu/apps/cognee/cognee-mcp && uv run python src/server.py --no-migration"
+      ]
+    }
+  }
+}

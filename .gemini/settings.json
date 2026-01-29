@@ -1,15 +1,21 @@
 {
-    "mcpServers": {
-        "serena": {
-            "command": "uvx",
-            "args": [
-                "--from",
-                "git+https://github.com/oraios/serena",
-                "serena",
-                "start-mcp-server",
-                "--context",
-                "ide"
-            ]
-        }
+  "mcpServers": {
+    "serena": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/oraios/serena",
+        "serena",
+        "start-mcp-server",
+        "--context",
+        "ide"
+      ]
+    },
+    "cognee-local": {
+      "command": "",
+      "args": [
+        "cd /home/ashiedu/apps/cognee/cognee-mcp && uv run python src/server.py --no-migration"
+      ]
     }
+  }
 }
