@@ -148,8 +148,11 @@ class SpatialNoiseCanceller:
         signal_mag = torch.mean(torch.abs(signal))
         return anti_phase * signal_mag
 
-    def cancel(self, rx1: torch.Tensor, rx2: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, Dict]:
+    def cancel(self, rx1: torch.Tensor, rx2: torch.Tensor, 
+               tx1_ref: Optional[torch.Tensor] = None, 
+               tx2_ref: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor, Dict]:
         """Perform multi-stage spatial and acoustic cancellation."""
+        # Ensure correct dtypes
         if not rx1.is_complex(): rx1 = rx1.to(torch.complex64)
         if not rx2.is_complex(): rx2 = rx2.to(torch.complex64)
         
@@ -160,7 +163,10 @@ class SpatialNoiseCanceller:
         clean_spatial = self._mvdr_beamform_2x2(rx1, rx2, doa_idx)
         
         # 3. Adaptive LMS (SEMI-VECTORIZED)
-        clean_lms = self._adaptive_lms(clean_spatial, rx2)
+        # If tx1_ref is provided, we can use it as the interference reference 
+        # for more direct cancellation. Otherwise use rx2 as interference proxy.
+        ref_lms = tx1_ref if tx1_ref is not None else rx2
+        clean_lms = self._adaptive_lms(clean_spatial, ref_lms)
         
         # 4. Expert: Active Audio Cancellation
         fs = self.config.get('sample_rate', 10e6)

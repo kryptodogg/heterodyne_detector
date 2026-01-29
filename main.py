@@ -96,28 +96,33 @@ class RadarGeometry:
         """
         self.device = device
 
-        # Helper to convert numpy/list to tensor DIRECTLY on device (zero-copy)
-        def to_tensor(key: str) -> torch.Tensor:
+        # Helper to create tensors on CPU first for safe math
+        def to_cpu_tensor(key: str) -> torch.Tensor:
             return torch.tensor(
                 config[key]['position'],
                 dtype=torch.float32,
-                device=device  # Create directly on target device
+                device=torch.device('cpu')
             )
 
-        # Create tensors directly on GPU (no CPU intermediate step)
-        self.tx1_pos = to_tensor('TX1')
-        self.tx2_pos = to_tensor('TX2')
-        self.rx1_pos = to_tensor('RX1')
-        self.rx2_pos = to_tensor('RX2')
+        # Create positions on CPU
+        tx1_cpu = to_cpu_tensor('TX1')
+        tx2_cpu = to_cpu_tensor('TX2')
+        rx1_cpu = to_cpu_tensor('RX1')
+        rx2_cpu = to_cpu_tensor('RX2')
 
-        # Calculate derived metrics (baseline is scalar, stays on CPU)
-        self.baseline = float(torch.norm(self.rx2_pos - self.rx1_pos).cpu())
+        # Calculate derived metrics on CPU (safe)
+        self.baseline = float(torch.norm(rx2_cpu - rx1_cpu).item())
 
-        # Calculate wavelength from actual center frequency (no hardcoding)
+        # Move to target device ONLY after math is done
+        self.tx1_pos = tx1_cpu.to(device)
+        self.tx2_pos = tx2_cpu.to(device)
+        self.rx1_pos = rx1_cpu.to(device)
+        self.rx2_pos = rx2_cpu.to(device)
+
+        # Calculate wavelength on CPU
         if 'wavelength' in config and config['wavelength'] is not None:
             self.wavelength = float(config['wavelength'])
         else:
-            # Use actual center frequency or fall back to GPU_CONFIG default
             freq = center_freq if center_freq is not None else GPU_CONFIG.get('center_freq', 2.4e9)
             self.wavelength = SPEED_OF_LIGHT / freq
 
