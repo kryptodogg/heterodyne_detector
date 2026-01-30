@@ -28,8 +28,12 @@ class RadioToAcousticHeterodyner:
         self.rf_freq = rf_freq_hz
         self.target_audio_freq = target_audio_freq_hz
         self.sample_rate = sample_rate_hz
-        self.device = device
+        self.device = torch.device(device) if isinstance(device, str) else device
         self.stages = self._design_conversion_stages()
+
+        # Cache for performance optimization (bolt)
+        self.cached_t = None
+        self.cached_los = {}
 
     def _design_conversion_stages(self):
         stages = []
@@ -45,10 +49,23 @@ class RadioToAcousticHeterodyner:
     def full_heterodyne_pipeline(self, iq_signal: torch.Tensor) -> Dict[str, torch.Tensor]:
         """Convert RF IQ to audio-range complex signal."""
         curr_signal = iq_signal.to(self.device)
-        t = torch.arange(len(curr_signal), device=self.device) / self.sample_rate
+        curr_len = len(curr_signal)
+
+        # Check cache validity
+        use_cache = False
+        if self.cached_t is not None:
+             if len(self.cached_t) == curr_len and self.cached_t.device == self.device:
+                 use_cache = True
+
+        if not use_cache:
+            # Recompute and cache
+            self.cached_t = torch.arange(curr_len, device=self.device) / self.sample_rate
+            self.cached_los = {}
+            for i, stage in enumerate(self.stages):
+                 self.cached_los[i] = torch.exp(-2j * np.pi * stage['lo_freq'] * self.cached_t)
         
-        for stage in self.stages:
-            lo = torch.exp(-2j * np.pi * stage['lo_freq'] * t)
+        for i, stage in enumerate(self.stages):
+            lo = self.cached_los[i]
             curr_signal = curr_signal * lo
             # Simple decimation/LPF approximation for speed
             # In production, we'd use a real LPF
