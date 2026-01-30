@@ -1,0 +1,91 @@
+[
+  {
+    "function_name": "combine_training_data",
+    "description": "Combine all individual training examples into a single dataset.",
+    "arguments": [],
+    "file_source": "combine_data.py"
+  },
+  {
+    "function_name": "count_examples",
+    "description": "Count the number of examples in a JSONL file.",
+    "arguments": [
+      {
+        "name": "file_path",
+        "type": "Any"
+      }
+    ],
+    "file_source": "combine_data.py"
+  },
+  {
+    "function_name": "create_training_dataset",
+    "description": "Create a comprehensive training dataset for radar processing.",
+    "arguments": [],
+    "file_source": "train_radar_expert.py"
+  },
+  {
+    "function_name": "train_model",
+    "description": "Train the radar processing model.",
+    "arguments": [],
+    "file_source": "train_radar_expert.py"
+  },
+  {
+    "function_name": "prepare_for_ollama",
+    "description": "Prepare the model for serving with Ollama.",
+    "arguments": [],
+    "file_source": "train_radar_expert.py"
+  },
+  {
+    "function_name": "main",
+    "description": "Main training function.",
+    "arguments": [],
+    "file_source": "train_radar_expert.py"
+  },
+  {
+    "function_name": "explain_torch_first_principles",
+    "description": "Explain Torch-first architecture principles.",
+    "arguments": [],
+    "file_source": "dorothy_radar_expert.py"
+  },
+  {
+    "function_name": "demonstrate_gpu_acceleration",
+    "description": "Demonstrate GPU acceleration benefits.",
+    "arguments": [
+      {
+        "name": "signal_size",
+        "type": "Any",
+        "default": "1024"
+      }
+    ],
+    "file_source": "dorothy_radar_expert.py"
+  },
+  {
+    "function_name": "explain_signal_processing_pipeline",
+    "description": "Explain the complete radar signal processing pipeline.",
+    "arguments": [],
+    "file_source": "dorothy_radar_expert.py"
+  },
+  {
+    "function_name": "get_practical_example",
+    "description": "Provide a practical implementation example.",
+    "arguments": [
+      {
+        "name": "topic",
+        "type": "Any",
+        "default": "range_doppler"
+      }
+    ],
+    "file_source": "dorothy_radar_expert.py"
+  },
+  {
+    "function_name": "integrate_with_opencode_claude",
+    "description": "Prepare Dorothy for integration with OpenCode and Claude Code tools.",
+    "arguments": [],
+    "file_source": "dorothy_radar_expert.py"
+  },
+  {
+    "function_name": "main",
+    "description": "Main function to create Dorothy's radar processing expertise.",
+    "arguments": [],
+    "file_source": "dorothy_radar_expert.py"
+  }
+]

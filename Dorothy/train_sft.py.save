@@ -1,0 +1,42 @@
+# train_sft.py
+from datasets import load_dataset
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from trl import SFTTrainer, SFTTrainingArguments
+
+def main():
+    model_name = ""  # small model for demo; adjust as needed
+
+    # Data: train.jsonl and valid.jsonl with {"text": "..."} entries
+    dataset = load_dataset("json", data_files={"train": "train.jsonl", "validation": "valid.jsonl"})
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer.pad_token = tokenizer.eos_token
+    model = AutoModelForCausalLM.from_pretrained(model_name)
+
+    train_dataset = dataset["train"].shuffle(seed=42).select(range(1000))  # adjust size
+    eval_dataset = dataset["validation"].shuffle(seed=42).select(range(200))
+
+    training_args = SFTTrainingArguments(
+        output_dir="outputs",
+        per_device_train_batch_size=1,
+        gradient_accumulation_steps=4,
+        num_train_epochs=1,
+        fp16=True,  # requires compatible GPU; ok to drop for CPU
+        logging_steps=10,
+        save_steps=100,
+        evaluation_strategy="steps",
+        eval_steps=50,
+    )
+
+    trainer = SFTTrainer(
+        model=model,
+        tokenizer=tokenizer,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
+        args=training_args,
+    )
+
+    trainer.train()
+
+if __name__ == "__main__":
+    main()
